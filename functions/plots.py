@@ -2,11 +2,13 @@ from matplotlib.colors import BoundaryNorm
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import cartopy.crs as ccrs
+from functions.get_physics import get_mp_and_pbl
 from wrf import getvar, to_np, latlon_coords, get_cartopy, extract_times
 import numpy as np
 import pandas as pd
 import gc
 import cmaps
+import matplotlib.dates as mdates
 
 def plot_T2_15facet(df, domain, timestep, levels = np.arange(-5, 22.5, 2.5), cmap = cmaps.precip2_17lev, fig_path = "./"):
     norm = BoundaryNorm(levels, ncolors=cmap.N)
@@ -201,3 +203,59 @@ def plot_RH2_15facet(df, domain, timestep, levels = np.arange(0, 110, 10), cmap 
     plt.show()
     fig.savefig(f"{fig_path}RH2_{domain}_15facet.png", dpi=300, bbox_inches='tight', pad_inches=0.1)
     gc.collect()
+
+def plot_timeseries_15(df, variable):
+    if variable == "t2m":
+        variable_in_use = "2_Metre_Sicaklik(C)"
+        title = "2 Meters Temperatures"
+        y_label = "Temperature (°C)"
+    elif variable == "tp":
+        variable_in_use = "Yagis(mm)"
+        title = "Hourly Precipitations"
+        y_label = "Precipitation (mm)"
+    elif variable == "ws10":
+        variable_in_use = "10_Metre_Ruzgar(m/s)"
+        title = "10 Meters Wind Speeds"
+        y_label = "Wind Speed (m/s)"
+    else:
+        raise ValueError("Invalid variable input.")
+    
+    fig, ax = plt.subplots(figsize=(20, 12))
+
+    for set_name, data_frame in df.items():
+        if not data_frame.empty and 'Tarih' in data_frame.columns and variable_in_use in data_frame.columns:
+            try:
+                mp_val, pbl_val = get_mp_and_pbl(set_name)
+
+                plot_dates = pd.to_datetime(data_frame['Tarih'])
+                plot_temps = data_frame[variable_in_use]
+                ax.plot(plot_dates, plot_temps, label=f"MP={mp_val} PBL={pbl_val}")
+            except IndexError:
+                print(f"Warning: Could not find physics mapping for {set_name}. Skipping label generation.")
+            except Exception as e:
+                print(f"Warning: Could not plot data for {set_name}. Error: {e}")
+        else:
+            print(f"Warning: Skipping {set_name} due to missing data or columns.")
+
+
+    ax.set_xlabel("Date", fontsize=18)
+    ax.set_ylabel(y_label, fontsize=18)
+    ax.set_title(f"{title}\nStation: {df["SET1"]["Istasyon_Numarasi"].iloc[0]}", fontsize=24)
+    ax.legend(fontsize=14)
+    ax.grid(True)
+
+    ax.tick_params(axis='x', labelsize=14)
+    ax.tick_params(axis='y', labelsize=14)
+
+    start_date = pd.to_datetime("2024-11-22 00:00:00")
+    end_date = pd.to_datetime("2024-11-25 00:00:00")
+    ax.set_xlim(start_date, end_date)
+
+
+    ax.xaxis.set_major_locator(mdates.HourLocator(byhour=range(0, 24, 3))) 
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+
+    fig.autofmt_xdate()
+
+    plt.tight_layout()
+    plt.show()
