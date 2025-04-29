@@ -7,7 +7,7 @@ from wrf import getvar
 from datetime import timedelta
 import gc
 
-base_dir = r"D:\istanbul_wrfouts\23112024"
+base_dir = r"D:\istanbul_wrfouts\20012024"
 sets = [f"SET{i}" for i in range(1, 16)]
 df = {}
 
@@ -44,6 +44,7 @@ for set in sets:
 
         df_point = pd.concat([tp, t2, psfc, ws10], axis=1)
         df_point.columns = ["Yagis(mm)", "2_Metre_Sicaklik(C)", "Yuzey_Basinci(mb)", "10_Metre_Ruzgar(m/s)"]
+        df_point.index.name = "Time"
 
         df_point["Istasyon_Adi"] = row["StationName"]
         df_point["Istasyon_Numarasi"] = row["StationID"]
@@ -55,7 +56,8 @@ for set in sets:
 
         column_order = [
             "Istasyon_Adi", "Istasyon_Numarasi", "Enlem", "Boylam", "Tarih",
-            "Yagis(mm)", "2_Metre_Sicaklik(C)", "Yuzey_Basinci(mb)", "10_Metre_Ruzgar(m/s)"
+            "Yagis(mm)", "2_Metre_Sicaklik(C)",
+            "Yuzey_Basinci(mb)", "10_Metre_Ruzgar(m/s)"
         ]
         df_point = df_point[column_order]
 

@@ -240,7 +240,7 @@ def plot_timeseries_15(df, variable):
 
     ax.set_xlabel("Date", fontsize=18)
     ax.set_ylabel(y_label, fontsize=18)
-    ax.set_title(f"{title}\nStation: {df["SET1"]["Istasyon_Numarasi"].iloc[0]}", fontsize=24)
+    ax.set_title(f'{title}\nStation: {df["SET1"]["Istasyon_Numarasi"].iloc[0]}', fontsize=24)
     ax.legend(fontsize=14)
     ax.grid(True)
 
