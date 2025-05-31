@@ -2,7 +2,7 @@ from matplotlib.colors import BoundaryNorm
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import cartopy.crs as ccrs
-from functions.get_physics import get_mp_and_pbl
+from functions.get_physics import get_mp_and_pbl, sets_mapping
 from wrf import getvar, to_np, latlon_coords, get_cartopy, extract_times, ALL_TIMES
 import numpy as np
 import pandas as pd
@@ -250,75 +250,105 @@ def plot_PRECIP_15facet(df, domain, timestep, levels = [0.1, 0.2, 0.5, 1, 2, 5, 
     gc.collect()
     plt.close()
 
-def plot_timeseries_15(df, variable, fig_path = os.getcwd()):
-    """
-    df must contain all the dataframes which belongs to a specific station's specific case. 
-    """
+def plot_timeseries_15(case, station_id, variable, path_to_wrfout_csvs=os.path.join(os.getcwd(), "csv_files"),
+                       path_to_obs_csvs=os.path.join(os.getcwd(), "obs_csvs"), fig_path=os.getcwd()):
+    
+    matching_files = []
+    df = {}
 
+    # Match WRF output files
+    if os.path.isdir(path_to_wrfout_csvs):
+        for filename in os.listdir(path_to_wrfout_csvs):
+            if filename.startswith(f"case_{case}") and filename.endswith(f"{station_id}.csv"):
+                matching_files.append(os.path.join(path_to_wrfout_csvs, filename))
+
+    # Set variable mappings
     if variable == "t2m":
         variable_in_use = "2_Metre_Sicaklik(C)"
+        obs_variable = "t2_degC"
         title = "2 Meters Temperatures"
         y_label = "Temperature (°C)"
     elif variable == "tp":
         variable_in_use = "Yagis(mm)"
+        obs_variable = "precip_mm"
         title = "Hourly Precipitations"
         y_label = "Precipitation (mm)"
     elif variable == "ws10":
         variable_in_use = "10_Metre_Ruzgar(m/s)"
+        obs_variable = "wdir_ws_deg_mps"
         title = "10 Meters Wind Speeds"
         y_label = "Wind Speed (m/s)"
     else:
         raise ValueError("Invalid variable input.")
-    
-    fig, ax = plt.subplots(figsize=(20, 12))
 
+    # Read WRF output CSVs
+    for file in matching_files:
+        physics = file.split(f"case_{case}")[1].split("_station")[0].lstrip("_")
+        set_name = sets_mapping.loc[sets_mapping["physics"] == physics, "set_name"].values[0]
+        df[set_name] = pd.read_csv(file)
+
+    fig, ax = plt.subplots(figsize=(20, 12))
+    all_plot_dates = []
+
+    # Plot WRF simulations
     for set_name, data_frame in df.items():
         if not data_frame.empty and 'Tarih' in data_frame.columns and variable_in_use in data_frame.columns:
             try:
                 mp_val, pbl_val = get_mp_and_pbl(set_name)
-
                 plot_dates = pd.to_datetime(data_frame['Tarih'])
-                plot_temps = data_frame[variable_in_use]
-                ax.plot(plot_dates, plot_temps, label=f"MP={mp_val} PBL={pbl_val}")
-            except IndexError:
-                print(f"Warning: Could not find physics mapping for {set_name}. Skipping label generation.")
+                all_plot_dates.extend(plot_dates)
+                plot_values = data_frame[variable_in_use]
+                ax.plot(plot_dates, plot_values, label=f"MP={mp_val} PBL={pbl_val}")
             except Exception as e:
                 print(f"Warning: Could not plot data for {set_name}. Error: {e}")
         else:
             print(f"Warning: Skipping {set_name} due to missing data or columns.")
 
-    start_date = plot_dates[0]
-    end_date = plot_dates[len(plot_dates) - 1]
-    station_id = df["SET1"]["Istasyon_Numarasi"].iloc[0]
-    case = (start_date + timedelta(1)).strftime("%Y%m%d")
+    # Plot OBS data
+    obs_filename = f"{case[:6]}_{obs_variable}_{station_id}.csv"
+    obs_path = os.path.join(path_to_obs_csvs, obs_filename)
+    if os.path.exists(obs_path):
+        try:
+            obs_df = pd.read_csv(obs_path, parse_dates=["datetime"])
+            if obs_variable == "wdir_ws_deg_mps":
+                obs_df = obs_df.rename(columns={"value": "ws10_mps"})
+                obs_df = obs_df.dropna(subset=["ws10_mps"])
+                obs_df = obs_df.rename(columns={"ws10_mps": "value"})
+            else:
+                obs_df = obs_df.dropna(subset=["value"])
+            ax.plot(obs_df["datetime"], obs_df["value"], 'k--', linewidth=2.5, label="Observation")
+        except Exception as e:
+            print(f"Warning: Could not load or plot observation data. Error: {e}")
 
+    if all_plot_dates:
+        start_date = min(all_plot_dates)
+        end_date = max(all_plot_dates)
+        ax.set_xlim((start_date - timedelta(hours=3)), (end_date + timedelta(hours=3)))
+        case_label = (start_date + timedelta(days=1)).strftime("%Y%m%d")
+        station_num = df["SET1"]["Istasyon_Numarasi"].iloc[0]
+    else:
+        print("No valid WRF data available. Aborting plot.")
+        return
+
+    # Axis formatting and figure settings
     ax.set_ylabel(y_label, fontsize=22)
-    ax.set_title(f'{title}\nStation: {station_id}', fontsize=28)
-    ax.legend(fontsize=18)
+    ax.set_title(f'{title}\nStation: {station_num}', fontsize=28)
+    ax.tick_params(axis='x', labelsize=18)
+    ax.tick_params(axis='y', labelsize=18)
+
     ax.grid(True)
     ax.spines[['top', 'right']].set_visible(False)
     ax.yaxis.grid(True, linestyle='--', alpha=0.6)
-    ax.xaxis.grid(False)
-
-    ax.tick_params(axis='x', labelsize=18)
-    ax.tick_params(axis='y', labelsize=18)
-    ax.set_xlim((start_date + timedelta(hours = -3)), (end_date + timedelta(hours = 3)))
-
-
-    ax.xaxis.set_major_locator(mdates.HourLocator(byhour=range(0, 24, 3))) 
+    ax.xaxis.set_major_locator(mdates.HourLocator(byhour=range(0, 24, 3)))
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y/%m/%d %HZ'))
 
-    legend = ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15),
-              ncol=5, fontsize=20, frameon=False)
-
+    legend = ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=4, fontsize=20, frameon=False)
     for legline in legend.get_lines():
-        legline.set_linewidth(3)
+        legline.set_linewidth(4)
 
     fig.autofmt_xdate()
-
     plt.tight_layout()
 
     os.makedirs(fig_path, exist_ok=True)
-    fig.savefig(os.path.join(fig_path, f"{case}_{station_id}_{variable}.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
-
+    fig.savefig(os.path.join(fig_path, f"{case_label}_{station_id}_{variable}.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
     plt.show()
