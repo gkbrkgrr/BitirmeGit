@@ -7,7 +7,7 @@ from wrf import getvar
 from datetime import timedelta
 import gc
 
-base_dir = r"D:\istanbul_wrfouts\20012024"
+base_dir = r"D:\istanbul_wrfouts\02112023"
 sets = [f"SET{i}" for i in range(1, 16)]
 df = {}
 

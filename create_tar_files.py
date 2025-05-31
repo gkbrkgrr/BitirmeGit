@@ -4,7 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
 
-base_dir = r"D:\istanbul_wrfouts\20012024"
+base_dir = r"D:\istanbul_wrfouts\23112024"
 set_names = [f"SET{i}" for i in range(1, 16)]
 
 def create_tar(set_name):

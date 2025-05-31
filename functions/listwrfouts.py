@@ -10,7 +10,7 @@ def listWrfouts(archive_path, extract_dir):
         for file in files if file.startswith("wrfout")
     ]
 
-    if len(extracted_files) != 146:
+    if len(extracted_files) < 2:
         with tarfile.open(archive_path, "r:gz") as tar:
             for member in tar.getmembers():
                 member.name = member.name.replace(":", "_")  
