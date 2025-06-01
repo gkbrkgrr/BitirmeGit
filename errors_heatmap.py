@@ -59,7 +59,6 @@ def nrmse(pred, obs, eps=1e-12):
     rng  = obs.max() - obs.min()
     return np.nan if abs(rng) < eps else rmse / rng
 
-
 # ────────────────────────────────────────────────────────────────────
 # 1.  FILE DISCOVERY
 # ────────────────────────────────────────────────────────────────────
