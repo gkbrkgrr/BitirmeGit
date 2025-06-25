@@ -316,7 +316,7 @@ def plot_timeseries_15(case, station_id, variable, path_to_wrfout_csvs=os.path.j
                 obs_df = obs_df.rename(columns={"ws10_mps": "value"})
             else:
                 obs_df = obs_df.dropna(subset=["value"])
-            ax.plot(obs_df["datetime"], obs_df["value"], 'k--', linewidth=2.5, label="Observation")
+            ax.plot(obs_df["datetime"], obs_df["value"], linewidth=4, label="Observation", color = "black")
         except Exception as e:
             print(f"Warning: Could not load or plot observation data. Error: {e}")
 
@@ -333,7 +333,7 @@ def plot_timeseries_15(case, station_id, variable, path_to_wrfout_csvs=os.path.j
     # Axis formatting and figure settings
     ax.set_ylabel(y_label, fontsize=22)
     ax.set_title(f'{title}\nStation: {station_num}', fontsize=28)
-    ax.tick_params(axis='x', labelsize=18)
+    ax.tick_params(axis='x', labelsize=14)
     ax.tick_params(axis='y', labelsize=18)
 
     ax.grid(True)
@@ -351,4 +351,3 @@ def plot_timeseries_15(case, station_id, variable, path_to_wrfout_csvs=os.path.j
 
     os.makedirs(fig_path, exist_ok=True)
     fig.savefig(os.path.join(fig_path, f"{case_label}_{station_id}_{variable}.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
-    plt.show()
