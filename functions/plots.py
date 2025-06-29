@@ -351,3 +351,83 @@ def plot_timeseries_15(case, station_id, variable, path_to_wrfout_csvs=os.path.j
 
     os.makedirs(fig_path, exist_ok=True)
     fig.savefig(os.path.join(fig_path, f"{case_label}_{station_id}_{variable}.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
+
+def plot_obs_precip_2x2(path_to_obs_csvs="obs_csvs", fig_path=".", cases=["20231102", "20231129", "20240120", "20241123"]):
+    fig, axs = plt.subplots(2, 2, figsize=(20, 12))
+    axs = axs.flatten()
+    y_label = "Precipitation (mm)"
+    cmap = plt.colormaps['tab20']
+
+    global_min = float('inf')
+    global_max = float('-inf')
+    all_case_data = [[] for _ in range(4)]  # store data for each subplot to set ylim later
+
+    for i, case in enumerate(cases):
+        ax = axs[i]
+        yearmonth = case[:6]
+        matching_files = sorted([f for f in os.listdir(path_to_obs_csvs) if f.startswith(f"{yearmonth}_precip_mm")])
+        all_plot_dates = []
+
+        for j, file in enumerate(matching_files):
+            try:
+                station_id = file.split("_")[-1].split(".")[0]
+                file_path = os.path.join(path_to_obs_csvs, file)
+                df = pd.read_csv(file_path, parse_dates=["datetime"])
+                df = df.dropna(subset=["value"])
+                if df.empty:
+                    continue
+
+                df["datetime"] = pd.to_datetime(df["datetime"])
+                case_datetime = pd.to_datetime(case, format="%Y%m%d")
+                start_window = case_datetime - pd.Timedelta(days=1)
+                end_window = case_datetime + pd.Timedelta(days=1)
+                df = df[(df["datetime"] >= start_window) & (df["datetime"] <= end_window)]
+
+                if df.empty:
+                    continue
+
+                color = cmap(j % 20)
+                ax.plot(df["datetime"], df["value"], label=f"Station {station_id}", linewidth=2, color=color)
+                all_plot_dates.extend(df["datetime"])
+
+                # Track global min/max for y-axis
+                global_min = min(global_min, df["value"].min())
+                global_max = max(global_max, df["value"].max())
+
+            except Exception as e:
+                print(f"Error processing {file}: {e}")
+
+        if all_plot_dates:
+            start_date = min(all_plot_dates)
+            end_date = max(all_plot_dates)
+            ax.set_xlim((start_date - timedelta(hours=3)), (end_date + timedelta(hours=3)))
+        else:
+            ax.text(0.5, 0.5, f"No Data for {case}", transform=ax.transAxes, ha='center', va='center')
+
+        ax.set_title(f"Case: {case}", fontsize=20)
+        ax.set_ylabel(y_label, fontsize=16)
+        ax.tick_params(axis='x', labelsize=12)
+        ax.tick_params(axis='y', labelsize=14)
+        ax.xaxis_date()
+        ax.xaxis.set_major_locator(mdates.HourLocator(interval=6))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y%m%d %HZ'))
+        ax.grid(True)
+        ax.spines[['top', 'right']].set_visible(False)
+        ax.yaxis.grid(True, linestyle='--', alpha=0.6)
+
+        # Rotate x-axis labels
+        for label in ax.get_xticklabels():
+            label.set_rotation(15)
+            label.set_ha('right')
+
+    # Set equal y-limits across all subplots
+    if global_min < float('inf') and global_max > float('-inf'):
+        for ax in axs:
+            ax.set_ylim(global_min - 1, global_max + 1)
+
+    # Shared legend
+    handles, labels = axs[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, -0.05), ncol=6, fontsize=14, frameon=False)
+    plt.tight_layout(rect=[0, 0.03, 1, 1])
+    os.makedirs(fig_path, exist_ok=True)
+    fig.savefig(os.path.join(fig_path, f"obs_precipitation_timeseries_2x2.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
